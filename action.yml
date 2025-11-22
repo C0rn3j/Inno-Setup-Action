@@ -12,6 +12,14 @@ inputs:
   options:
     description: 'Extra arguments/options to include. Include the slashes for them.'
     required: false
+  install_latest:
+    description: 'Set to true to download and install the latest Inno Setup from the installer URL before running.'
+    required: false
+    default: 'false'
+  installer_url:
+    description: 'URL to download the Inno Setup installer (can be overridden).'
+    required: false
+    default: 'https://jrsoftware.org/download.php/is.exe?site=1'
     
 runs:
   using: 'node20'
