@@ -27428,6 +27428,13 @@ var __webpack_exports__ = {};
 /* harmony import */ var fs__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(9896);
 /* harmony import */ var child_process__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(5317);
 /* harmony import */ var util__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(9023);
+/* harmony import */ var https__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(5692);
+/* harmony import */ var os__WEBPACK_IMPORTED_MODULE_5__ = __nccwpck_require__(857);
+/* harmony import */ var path__WEBPACK_IMPORTED_MODULE_6__ = __nccwpck_require__(6928);
+
+
+
+
 
 
 
@@ -27438,7 +27445,12 @@ const execFilePromise = (0,util__WEBPACK_IMPORTED_MODULE_3__.promisify)(child_pr
 
 const workspacePath = process.env.GITHUB_WORKSPACE;
 const options = _actions_core__WEBPACK_IMPORTED_MODULE_0__.getMultilineInput("options");
-const path = _actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput("path");
+const scriptInput = _actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput("path");
+const installLatest =
+  (_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput("install_latest") || "false").toLowerCase() === "true";
+const installerUrl =
+  _actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput("installer_url") ||
+  "https://jrsoftware.org/download.php/is.exe?site=1";
 
 async function run() {
   try {
@@ -27465,27 +27477,127 @@ async function run() {
 
     const escapedOptions = options.map((str) => str.replace(/(["'])/g, "$1"));
 
-    // Install Inno Setup silently
-    try {
-      const { stdout, stderr } = await execPromise(`choco install innosetup`);
-      console.error(stderr);
-    } catch (err) {
-      throw new Error(
-        `Failed to install Inno Setup: ${err.stderr || err.message}`,
-      );
+    async function downloadFile(url, dest) {
+      return new Promise((resolve, reject) => {
+        const maxRedirects = 5;
+        function getUrl(u, redirects) {
+          if (redirects > maxRedirects)
+            return reject(
+              new Error("Too many redirects while downloading installer"),
+            );
+          https__WEBPACK_IMPORTED_MODULE_4__.get(u, (res) => {
+              if (
+                res.statusCode >= 300 &&
+                res.statusCode < 400 &&
+                res.headers.location
+              ) {
+                return getUrl(res.headers.location, redirects + 1);
+              }
+              if (res.statusCode !== 200) {
+                return reject(
+                  new Error(`Download failed with status ${res.statusCode}`),
+                );
+              }
+              const file = (0,fs__WEBPACK_IMPORTED_MODULE_1__.createWriteStream)(dest);
+              res.pipe(file);
+              file.on("finish", () => file.close(resolve));
+              file.on("error", reject);
+            })
+            .on("error", reject);
+        }
+        getUrl(url, 0);
+      });
     }
 
-    // Run Inno Setup Compiler
-    const isccPath = `${process.env["ProgramFiles(x86)"]}\\Inno Setup 6\\iscc.exe`;
-    const scriptPath = `${workspacePath}\\${path}`;
+    async function findIscc() {
+      const candidates = [];
+      const pf86 = process.env["ProgramFiles(x86)"];
+      const pf = process.env["ProgramFiles"];
+      if (pf86) {
+        candidates.push(path__WEBPACK_IMPORTED_MODULE_6__.join(pf86, "Inno Setup 6", "iscc.exe"));
+        candidates.push(path__WEBPACK_IMPORTED_MODULE_6__.join(pf86, "Inno Setup 7", "iscc.exe"));
+        candidates.push(path__WEBPACK_IMPORTED_MODULE_6__.join(pf86, "Inno Setup", "iscc.exe"));
+      }
+      if (pf) {
+        candidates.push(path__WEBPACK_IMPORTED_MODULE_6__.join(pf, "Inno Setup 6", "iscc.exe"));
+        candidates.push(path__WEBPACK_IMPORTED_MODULE_6__.join(pf, "Inno Setup 7", "iscc.exe"));
+        candidates.push(path__WEBPACK_IMPORTED_MODULE_6__.join(pf, "Inno Setup", "iscc.exe"));
+      }
+
+      for (const p of candidates) {
+        try {
+          await fs__WEBPACK_IMPORTED_MODULE_1__.promises.access(p);
+          return p;
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // Fallback to 'where' to see if it's on PATH
+      try {
+        const { stdout } = await execPromise("where iscc.exe");
+        const line = stdout.split(/\r?\n/).find(Boolean);
+        if (line) return line.trim();
+      } catch (e) {
+        // ignore
+      }
+
+      return null;
+    }
+
+    // Install Inno Setup: either download+install latest or fallback to choco
+    if (installLatest) {
+      const tmpExe = path__WEBPACK_IMPORTED_MODULE_6__.join(
+        os__WEBPACK_IMPORTED_MODULE_5__.tmpdir(),
+        `inno-setup-installer-${Date.now()}.exe`,
+      );
+      try {
+        _actions_core__WEBPACK_IMPORTED_MODULE_0__.info(`Downloading Inno Setup from ${installerUrl} ...`);
+        await downloadFile(installerUrl, tmpExe);
+        _actions_core__WEBPACK_IMPORTED_MODULE_0__.info(`Running installer silently: ${tmpExe}`);
+        await execFilePromise(tmpExe, [
+          "/VERYSILENT",
+          "/SUPPRESSMSGBOXES",
+          "/NORESTART",
+          "/SP-",
+        ]);
+      } catch (err) {
+        _actions_core__WEBPACK_IMPORTED_MODULE_0__.warning(
+          `Download/install failed: ${err.message}. Falling back to Chocolatey.`,
+        );
+        try {
+          await execPromise(`choco install innosetup -y`);
+        } catch (err2) {
+          throw new Error(
+            `Failed to install Inno Setup: ${err2.stderr || err2.message}`,
+          );
+        }
+      }
+    } else {
+      try {
+        await execPromise(`choco install innosetup -y`);
+      } catch (err) {
+        throw new Error(
+          `Failed to install Inno Setup: ${err.stderr || err.message}`,
+        );
+      }
+    }
+
+    // Locate iscc.exe
+    const isccPath = await findIscc();
+    if (!isccPath) {
+      throw new Error("Could not locate iscc.exe after installation.");
+    }
+
+    const scriptPath = path__WEBPACK_IMPORTED_MODULE_6__.join(workspacePath, scriptInput);
 
     try {
       const { stdout, stderr } = await execFilePromise(isccPath, [
         scriptPath,
         ...escapedOptions,
       ]);
-      console.log(stdout);
-      console.error(stderr);
+      if (stdout) console.log(stdout);
+      if (stderr) console.error(stderr);
     } catch (err) {
       throw new Error(`Execution failed: ${err.stderr || err.message}`);
     }

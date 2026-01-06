@@ -13,8 +13,11 @@ const execFilePromise = promisify(execFile);
 const workspacePath = process.env.GITHUB_WORKSPACE;
 const options = core.getMultilineInput("options");
 const scriptInput = core.getInput("path");
-const installLatest = (core.getInput("install_latest") || "false").toLowerCase() === "true";
-const installerUrl = core.getInput("installer_url") || "https://jrsoftware.org/download.php/is.exe?site=1";
+const installLatest =
+  (core.getInput("install_latest") || "false").toLowerCase() === "true";
+const installerUrl =
+  core.getInput("installer_url") ||
+  "https://jrsoftware.org/download.php/is.exe?site=1";
 
 async function run() {
   try {
@@ -45,19 +48,30 @@ async function run() {
       return new Promise((resolve, reject) => {
         const maxRedirects = 5;
         function getUrl(u, redirects) {
-          if (redirects > maxRedirects) return reject(new Error("Too many redirects while downloading installer"));
-          https.get(u, (res) => {
-            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-              return getUrl(res.headers.location, redirects + 1);
-            }
-            if (res.statusCode !== 200) {
-              return reject(new Error(`Download failed with status ${res.statusCode}`));
-            }
-            const file = createWriteStream(dest);
-            res.pipe(file);
-            file.on("finish", () => file.close(resolve));
-            file.on("error", reject);
-          }).on("error", reject);
+          if (redirects > maxRedirects)
+            return reject(
+              new Error("Too many redirects while downloading installer"),
+            );
+          https
+            .get(u, (res) => {
+              if (
+                res.statusCode >= 300 &&
+                res.statusCode < 400 &&
+                res.headers.location
+              ) {
+                return getUrl(res.headers.location, redirects + 1);
+              }
+              if (res.statusCode !== 200) {
+                return reject(
+                  new Error(`Download failed with status ${res.statusCode}`),
+                );
+              }
+              const file = createWriteStream(dest);
+              res.pipe(file);
+              file.on("finish", () => file.close(resolve));
+              file.on("error", reject);
+            })
+            .on("error", reject);
         }
         getUrl(url, 0);
       });
@@ -101,25 +115,39 @@ async function run() {
 
     // Install Inno Setup: either download+install latest or fallback to choco
     if (installLatest) {
-      const tmpExe = pathModule.join(os.tmpdir(), `inno-setup-installer-${Date.now()}.exe`);
+      const tmpExe = pathModule.join(
+        os.tmpdir(),
+        `inno-setup-installer-${Date.now()}.exe`,
+      );
       try {
         core.info(`Downloading Inno Setup from ${installerUrl} ...`);
         await downloadFile(installerUrl, tmpExe);
         core.info(`Running installer silently: ${tmpExe}`);
-        await execFilePromise(tmpExe, ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-"]);
+        await execFilePromise(tmpExe, [
+          "/VERYSILENT",
+          "/SUPPRESSMSGBOXES",
+          "/NORESTART",
+          "/SP-",
+        ]);
       } catch (err) {
-        core.warning(`Download/install failed: ${err.message}. Falling back to Chocolatey.`);
+        core.warning(
+          `Download/install failed: ${err.message}. Falling back to Chocolatey.`,
+        );
         try {
           await execPromise(`choco install innosetup -y`);
         } catch (err2) {
-          throw new Error(`Failed to install Inno Setup: ${err2.stderr || err2.message}`);
+          throw new Error(
+            `Failed to install Inno Setup: ${err2.stderr || err2.message}`,
+          );
         }
       }
     } else {
       try {
         await execPromise(`choco install innosetup -y`);
       } catch (err) {
-        throw new Error(`Failed to install Inno Setup: ${err.stderr || err.message}`);
+        throw new Error(
+          `Failed to install Inno Setup: ${err.stderr || err.message}`,
+        );
       }
     }
 
@@ -132,7 +160,10 @@ async function run() {
     const scriptPath = pathModule.join(workspacePath, scriptInput);
 
     try {
-      const { stdout, stderr } = await execFilePromise(isccPath, [scriptPath, ...escapedOptions]);
+      const { stdout, stderr } = await execFilePromise(isccPath, [
+        scriptPath,
+        ...escapedOptions,
+      ]);
       if (stdout) console.log(stdout);
       if (stderr) console.error(stderr);
     } catch (err) {
