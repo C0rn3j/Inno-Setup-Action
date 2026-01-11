@@ -120,7 +120,7 @@ async function run() {
         `inno-setup-installer-${Date.now()}.exe`,
       );
       try {
-        core.info(`Downloading Inno Setup from ${installerUrl} ...`);
+        core.info(`Downloading Inno Setup from ${installerUrl}…`);
         await downloadFile(installerUrl, tmpExe);
         core.info(`Running installer silently: ${tmpExe}`);
         await execFilePromise(tmpExe, [
@@ -134,7 +134,9 @@ async function run() {
           `Download/install failed: ${err.message}. Falling back to Chocolatey.`,
         );
         try {
+          core.info(`Installing Inno Setup via choco…`);
           await execPromise(`choco install innosetup -y`);
+          core.info(`Installed.`);
         } catch (err2) {
           throw new Error(
             `Failed to install Inno Setup: ${err2.stderr || err2.message}`,
@@ -143,7 +145,9 @@ async function run() {
       }
     } else {
       try {
+        core.info(`Installing Inno Setup via choco…`);
         await execPromise(`choco install innosetup -y`);
+          core.info(`Installed.`);
       } catch (err) {
         throw new Error(
           `Failed to install Inno Setup: ${err.stderr || err.message}`,
@@ -160,6 +164,7 @@ async function run() {
     const scriptPath = pathModule.join(workspacePath, scriptInput);
 
     try {
+      core.info(`Running iscc…`);
       const { stdout, stderr } = await execFilePromise(isccPath, [
         scriptPath,
         ...escapedOptions,
