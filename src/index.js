@@ -122,7 +122,7 @@ async function run() {
 
       // Fallback to 'where' to see if it's on PATH
       try {
-        const { stdout } = await spawnPromise("where", ["iscc.exe"]);
+        const { stdout } = await spawnPromise("where", ["iscc.exe"], { shell: true });
         const line = stdout.split(/\r?\n/).find(Boolean);
         if (line) return line.trim();
       } catch (e) {
