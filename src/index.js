@@ -129,6 +129,7 @@ async function run() {
           "/NORESTART",
           "/SP-",
         ]);
+        core.info(`Done installing`);
       } catch (err) {
         core.warning(
           `Download/install failed: ${err.message}. Falling back to Chocolatey.`,
