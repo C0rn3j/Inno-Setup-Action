@@ -3,12 +3,11 @@ import { promises as fs } from "fs";
 import { createWriteStream } from "fs";
 import { exec, execFile } from "child_process";
 import { promisify } from "util";
+import { spawn } from "child_process";
 import https from "https";
 import os from "os";
 import pathModule from "path";
 
-const execPromise = promisify(exec);
-const execFilePromise = promisify(execFile);
 
 const workspacePath = process.env.GITHUB_WORKSPACE;
 const options = core.getMultilineInput("options");
@@ -18,6 +17,26 @@ const installLatest =
 const installerUrl =
   core.getInput("installer_url") ||
   "https://jrsoftware.org/download.php/is.exe?site=1";
+
+function spawnPromise(command, args = [], options = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      shell: true,
+      stdio: "inherit",
+      ...options,
+    });
+
+    child.on("error", reject);
+
+    child.on("close", (code) => {
+      if (code !== 0) {
+        reject(new Error(`${command} exited with code ${code}`));
+      } else {
+        resolve();
+      }
+    });
+  });
+}
 
 async function run() {
   try {
@@ -103,7 +122,7 @@ async function run() {
 
       // Fallback to 'where' to see if it's on PATH
       try {
-        const { stdout } = await execPromise("where iscc.exe");
+        const { stdout } = await spawnPromise("where", ["iscc.exe"]);
         const line = stdout.split(/\r?\n/).find(Boolean);
         if (line) return line.trim();
       } catch (e) {
@@ -123,7 +142,7 @@ async function run() {
         core.info(`Downloading Inno Setup from ${installerUrl}…`);
         await downloadFile(installerUrl, tmpExe);
         core.info(`Running installer silently: ${tmpExe}`);
-        await execFilePromise(tmpExe, [
+        await spawnPromise(tmpExe, [
           "/VERYSILENT",
           "/SUPPRESSMSGBOXES",
           "/NORESTART",
@@ -136,7 +155,7 @@ async function run() {
         );
         try {
           core.info(`Installing Inno Setup via choco…`);
-          await execPromise(`choco install innosetup -y`);
+          await spawnPromise("choco", ["install", "innosetup", "-y"]);
           core.info(`Installed.`);
         } catch (err2) {
           throw new Error(
@@ -147,7 +166,7 @@ async function run() {
     } else {
       try {
         core.info(`Installing Inno Setup via choco…`);
-        await execPromise(`choco install innosetup -y`);
+        await spawnPromise("choco", ["install", "innosetup", "-y"]);
           core.info(`Installed.`);
       } catch (err) {
         throw new Error(
@@ -166,7 +185,7 @@ async function run() {
 
     try {
       core.info(`Running iscc…`);
-      const { stdout, stderr } = await execFilePromise(isccPath, [
+      const { stdout, stderr } = await spawnPromise(isccPath, [
         scriptPath,
         ...escapedOptions,
       ]);
