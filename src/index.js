@@ -178,7 +178,6 @@ async function run() {
     console.log("Inno Setup script compiled successfully.");
   } catch (error) {
     core.setFailed(error.message || "An unknown error occurred.");
-    process.exit(1);
   }
 }
 
