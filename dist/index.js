@@ -27454,7 +27454,7 @@ const installerUrl =
 function spawnPromise(command, args = [], options = {}) {
   return new Promise((resolve, reject) => {
     const child = (0,child_process__WEBPACK_IMPORTED_MODULE_2__.spawn)(command, args, {
-      shell: true,
+      shell: false,
       stdio: "inherit",
       ...options,
     });
