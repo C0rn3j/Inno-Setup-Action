@@ -185,12 +185,10 @@ async function run() {
 
     try {
       core.info(`Running iscc…`);
-      const { stdout, stderr } = await spawnPromise(isccPath, [
+      await spawnPromise(isccPath, [
         scriptPath,
         ...escapedOptions,
       ]);
-      if (stdout) console.log(stdout);
-      if (stderr) console.error(stderr);
     } catch (err) {
       throw new Error(`Execution failed: ${err.stderr || err.message}`);
     }

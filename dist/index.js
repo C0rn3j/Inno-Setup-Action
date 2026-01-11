@@ -27617,12 +27617,10 @@ async function run() {
 
     try {
       _actions_core__WEBPACK_IMPORTED_MODULE_0__.info(`Running iscc…`);
-      const { stdout, stderr } = await spawnPromise(isccPath, [
+      await spawnPromise(isccPath, [
         scriptPath,
         ...escapedOptions,
       ]);
-      if (stdout) console.log(stdout);
-      if (stderr) console.error(stderr);
     } catch (err) {
       throw new Error(`Execution failed: ${err.stderr || err.message}`);
     }
