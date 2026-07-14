@@ -17,9 +17,8 @@ inputs:
     required: false
     default: 'false'
   installer_url:
-    description: 'URL to download the Inno Setup installer (can be overridden).'
+    description: 'Optional Inno Setup installer URL. When omitted, the latest x64 installer is discovered from GitHub Releases.'
     required: false
-    default: 'https://jrsoftware.org/download.php/is.exe?site=1'
 
 runs:
   using: 'node24'
