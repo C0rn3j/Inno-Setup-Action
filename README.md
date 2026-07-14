@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Compile .ISS to .EXE Installer
-        uses: C0rn3j/Inno-Setup-Action@v1.2.8
+        uses: C0rn3j/Inno-Setup-Action@v1.2.9
         with:
           path: src/setup.iss
           options: /O+
